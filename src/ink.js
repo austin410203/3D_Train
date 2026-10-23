@@ -164,3 +164,12 @@ export function instancedInk(geo, color, count, edges = true) {
   h.instanceMatrix = m.instanceMatrix;
   return { mesh: m, hull: h };
 }
+
+// Free GPU buffers of a removed subtree. Shared geometry (userData.keep) and cached ink materials stay.
+export function disposeTree(root) {
+  root.traverse((o) => {
+    if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) if (m.userData.own) { if (m.map) m.map.dispose(); m.dispose(); }
+  });
+}

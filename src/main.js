@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { SHARED, inked, inkMat } from './ink.js';
+import { SHARED, inked, inkMat, disposeTree } from './ink.js';
+import { Hub, HUBS } from './hub.js';
 import { MODELS, MODEL_BY_ID, OPS } from './trains.js';
 import { buildConsist, setDoors } from './train.js';
 import { buildStation } from './station.js';
@@ -33,8 +34,8 @@ function resize() {
 addEventListener('resize', () => { fitCamera(false); resize(); });
 
 function fitCamera(resetView = true) {
-  if (!S.station) return;
-  const b = S.station.info.bounds;
+  const b = S.hub ? (S.viewAll ? S.hub.allBounds : S.hub.heroBounds) : S.station && S.station.info.bounds;
+  if (!b) return;
   const target = b.getCenter(new THREE.Vector3()); target.y = 1.2;
   if (resetView) {
     controls.target.copy(target);
@@ -67,8 +68,8 @@ const world = new THREE.Group(); scene.add(world);
 function clearPeople() { for (const p of S.people) world.remove(p.obj); S.people = []; }
 
 function loadModel(model, { keepCount = false } = {}) {
-  if (S.consist) world.remove(S.consist.group);
-  if (S.station) world.remove(S.station.group);
+  if (S.hub) leaveHub();
+  clearSingle();
   for (const s of S.smoke) world.remove(s.obj); S.smoke = [];
   clearPeople();
   S.model = model;
@@ -85,6 +86,32 @@ function loadModel(model, { keepCount = false } = {}) {
   fitCamera(true);
   updateUI();
   history.replaceState(null, '', '?m=' + model.id);
+}
+
+function clearSingle() {
+  if (S.consist) { world.remove(S.consist.group); disposeTree(S.consist.group); S.consist = null; }
+  if (S.station) { world.remove(S.station.group); disposeTree(S.station.group); S.station = null; }
+  for (const s of S.smoke) world.remove(s.obj); S.smoke = [];
+  clearPeople();
+}
+
+// ---------- big-station mode ----------
+function enterHub(key) {
+  if (S.hub) leaveHub();
+  clearSingle();
+  S.viewAll = false; S.heroNext = null;
+  S.hub = new Hub(key, { color: S.color, onHero: (tr) => { S.heroTrain = tr; if (S.heroNext === tr.model) S.heroNext = null; if (S.hub) updateUI(); } });
+  world.add(S.hub.group);
+  document.body.classList.add('hub');
+  controls.minZoom = 0.3;
+  fitCamera(true);
+  updateUI();
+  history.replaceState(null, '', '?s=' + key);
+}
+function leaveHub() {
+  world.remove(S.hub.group); S.hub.dispose(); S.hub = null;
+  document.body.classList.remove('hub');
+  controls.minZoom = 0.5;
 }
 
 function makeSlots() {
@@ -262,6 +289,7 @@ function updateSim(dt) {
   }
 }
 const PUFF_GEO = new THREE.IcosahedronGeometry(0.7, 1);
+PUFF_GEO.userData.keep = true;
 
 function nextTrain() {
   if (S.cycle) {
@@ -299,6 +327,19 @@ function filteredModels() {
 }
 
 function updateUI() {
+  $('#mode').value = S.hub ? S.hub.key : 'single';
+  if (S.hub) {
+    const h = S.hub, c = h.cfg, tr = S.heroTrain, m = tr.model, op = OPS[m.op];
+    $('#fig').textContent = `Fig. ${String(Object.keys(HUBS).indexOf(h.key) + 1).padStart(2, '0')} — ${c.ro} Station, track ${tr.no}`;
+    $('#title').innerHTML = `<b>${c.name}</b> ${c.ro} Station`;
+    $('#meta').innerHTML = `<span class="chip" style="--c:${c.color}">${h.islands.length} 座月台 · ${h.tracks.length} 股道</span>` +
+      `<span>${tr.no} 番線：<b>${m.name}</b>「${m.nick}」</span><span class="chip" style="--c:${op.color}">${op.name}</span>` +
+      (S.heroNext ? `<span>下一班：${S.heroNext.name}</span>` : '');
+    $('#desc').textContent = c.desc;
+    $('#overview').textContent = S.viewAll ? '回月台' : '全景';
+    document.querySelectorAll('#list .item').forEach(el => el.classList.toggle('on', el.dataset.id === m.id));
+    return;
+  }
   const m = S.model, op = OPS[m.op];
   $('#fig').textContent = `Fig. ${String(m.index).padStart(2, '0')} — ${m.en} at ${m.st.ro}`;
   $('#title').innerHTML = `<b>${m.name}</b> ${m.nick !== m.name ? `「${m.nick}」` : ''}`;
@@ -333,6 +374,7 @@ function swatchOf(m) {
 
 $('#list').onclick = (e) => {
   const b = e.target.closest('.item'); if (!b) return;
+  if (S.hub) { S.heroNext = MODEL_BY_ID[b.dataset.id]; S.hub.forceHero(S.heroNext); updateUI(); if (compact()) document.body.classList.remove('drawer'); return; }
   loadModel(MODEL_BY_ID[b.dataset.id], { keepCount: false });
   S.nShow = null;
   if (compact()) document.body.classList.remove('drawer');
@@ -345,8 +387,13 @@ else document.body.classList.add('drawer');
 $('#card').onclick = () => $('#card').classList.toggle('mini');
 $('#pause').onclick = () => { S.paused = !S.paused; $('#pause').textContent = S.paused ? '繼續' : '暫停'; };
 $('#cycle').onchange = (e) => { S.cycle = e.target.checked; };
-$('#prev').onclick = () => { const l = filteredModels(); const i = l.indexOf(S.model); loadModel(l[(i - 1 + l.length) % l.length] || MODELS[0], { keepCount: !!S.nShow }); };
-$('#next').onclick = () => { const l = filteredModels(); const i = l.indexOf(S.model); loadModel(l[(i + 1) % l.length] || MODELS[0], { keepCount: !!S.nShow }); };
+const HUB_KEYS = Object.keys(HUBS);
+const stepHub = (d) => enterHub(HUB_KEYS[(HUB_KEYS.indexOf(S.hub.key) + d + HUB_KEYS.length) % HUB_KEYS.length]);
+$('#mode').innerHTML = `<option value="single">單一月台</option>` + HUB_KEYS.map(k => `<option value="${k}">${HUBS[k].name}</option>`).join('');
+$('#mode').onchange = (e) => { const v = e.target.value; if (v === 'single') loadModel(S.model || MODEL_BY_ID.e5); else enterHub(v); };
+$('#overview').onclick = () => { S.viewAll = !S.viewAll; fitCamera(true); updateUI(); };
+$('#prev').onclick = () => { if (S.hub) return stepHub(-1); const l = filteredModels(); const i = l.indexOf(S.model); loadModel(l[(i - 1 + l.length) % l.length] || MODELS[0], { keepCount: !!S.nShow }); };
+$('#next').onclick = () => { if (S.hub) return stepHub(1); const l = filteredModels(); const i = l.indexOf(S.model); loadModel(l[(i + 1) % l.length] || MODELS[0], { keepCount: !!S.nShow }); };
 $('#wob').oninput = (e) => { SHARED.uWob.value = +e.target.value; };
 $('#cars').oninput = (e) => { $('#carsV').textContent = e.target.value; };
 $('#cars').onchange = (e) => { S.nShow = +e.target.value; loadModel(S.model, { keepCount: true }); };
@@ -358,6 +405,7 @@ $('#swatches').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#swatches button').forEach(x => x.classList.toggle('on', x === b));
   S.color = SW[+b.dataset.i];
+  if (S.hub) { S.hub.color = S.color; return; } // applies to the next trains
   // rebuild only the consist, keeping its position and door state
   const x = S.frontX, d = S.doorOpen;
   world.remove(S.consist.group);
@@ -374,10 +422,10 @@ addEventListener('keydown', (e) => {
 // ---------- loop ----------
 let last = performance.now();
 function frame(dt) {
-  if (!S.paused) updateSim(dt);
+  if (!S.paused) { if (S.hub) { S.time += dt; S.hub.update(dt); } else updateSim(dt); }
   if (SHARED.uWob.value > 0.001) SHARED.uBoil.value = Math.floor(S.time * 6) * 1.37;
-  $('#waiting').textContent = S.people.filter(p => p.role === 'wait' || p.role === 'board').length;
-  $('#boarded').textContent = S.boarded;
+  $('#waiting').textContent = S.hub ? S.hub.waitingCount : S.people.filter(p => p.role === 'wait' || p.role === 'board').length;
+  $('#boarded').textContent = S.hub ? S.hub.boarded : S.boarded;
   controls.update();
   const worldPerPx = (camera.top - camera.bottom) / camera.zoom / innerHeight;
   SHARED.uOutW.value = worldPerPx * 1.7;
@@ -391,11 +439,12 @@ function loop(now) {
 
 await document.fonts.ready.catch(() => {});
 buildList();
-const init = MODEL_BY_ID[new URLSearchParams(location.search).get('m')] || MODEL_BY_ID.e5;
-loadModel(init);
+const params = new URLSearchParams(location.search);
+const init = MODEL_BY_ID[params.get('m')] || MODEL_BY_ID.e5;
+if (HUBS[params.get('s')]) { S.model = init; enterHub(params.get('s')); } else loadModel(init);
 requestAnimationFrame(loop);
 
-window.__app = { S, frame: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, load: (id) => loadModel(MODEL_BY_ID[id]), MODELS,
+window.__app = { S, frame: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, load: (id) => loadModel(MODEL_BY_ID[id]), hub: (k) => enterHub(k), MODELS, renderer,
   focus(x, zoom = 3) { // debug: look closely at consist x position
     const p = new THREE.Vector3(S.frontX + x, 2, 0);
     camera.position.add(p.clone().sub(controls.target)); controls.target.copy(p); camera.zoom = zoom; camera.updateProjectionMatrix(); frame(0);

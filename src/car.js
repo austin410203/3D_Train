@@ -184,6 +184,7 @@ export function carGeometry(b, nf, nb, L) {
   g.computeVertexNormals();
   addOutN(g);
   g.userData.footprint = xs.map(x => [x, sectionAt(b, nf, nb, L, x).hw]);
+  g.userData.keep = true;
   geoCache.set(key, g);
   return g;
 }
@@ -356,7 +357,9 @@ export function makeCarMaterial(liv, opts) {
     uL: { value: opts.L }, uDouble: { value: opts.double ? 1 : 0 }, uSteel: { value: liv.steel ? 1 : 0 },
     uNoseF: { value: ws || lt ? nf.len : 0 }, uNoseB: { value: opts.double && (nb.ws || nb.lt) ? nb.len : 0 },
   };
-  return new THREE.ShaderMaterial({ uniforms: u, vertexShader: carVert, fragmentShader: carFrag });
+  const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: carVert, fragmentShader: carFrag });
+  mat.userData.own = true;
+  return mat;
 }
 
 // ---------- detail parts ----------

@@ -11,7 +11,7 @@ const PLAT = {
 
 const FONT = '"Noto Sans TC","Noto Sans JP","Microsoft JhengHei","Hiragino Sans",sans-serif';
 
-function signTexture(model) {
+export function signTexture(model) {
   const s = model.st;
   const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 300;
   const g = cv.getContext('2d');
@@ -44,9 +44,10 @@ function ledTexture(model) {
   return new THREE.CanvasTexture(cv);
 }
 
-function texturedBoard(w, h, d, tex) {
+export function texturedBoard(w, h, d, tex) {
   const side = inkMat('#f3f1ea');
   const face = new THREE.MeshBasicMaterial({ map: tex });
+  face.userData.own = true;
   const geo = new THREE.BoxGeometry(w, h, d);
   const m = new THREE.Mesh(geo, [side, side, side, side, face, face]);
   addOutN(geo);
