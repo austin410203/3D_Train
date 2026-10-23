@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>月台圖鑑 Platform Atlas</title>
+<meta name="description" content="three.js 手繪風月台：JR 各社、台灣高鐵與臺鐵列車進站、開門、乘客上下車。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+JP:wght@700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body class="drawer">
+<canvas id="scene"></canvas>
+
+<header id="hud-l">
+  <div id="fig" class="mono">Fig. 01</div>
+  <div class="mono dim">AUTOPLAY</div>
+  <div class="row">
+    <button id="toggleList" class="pill dark">☰ 車型</button>
+    <button id="pause" class="pill">暫停</button>
+    <button id="prev" class="pill" title="上一款 (←)">◀</button>
+    <button id="next" class="pill" title="下一款 (→)">▶</button>
+    <label class="pill check"><input id="cycle" type="checkbox" checked> 自動換車</label>
+  </div>
+  <div id="card">
+    <div id="title"></div>
+    <div id="meta"></div>
+    <p id="desc"></p>
+  </div>
+</header>
+
+<aside id="hud-r">
+  <div class="mono dim">WAITING</div><div id="waiting" class="big mono">0</div>
+  <div class="mono dim">BOARDED</div><div id="boarded" class="big mono">0</div>
+</aside>
+
+<nav id="drawer">
+  <div class="dh">
+    <b>車型清單</b><span id="count" class="mono dim"></span>
+    <button id="closeList" class="pill" style="margin-left:auto">✕</button>
+  </div>
+  <input id="search" type="search" placeholder="搜尋車型、愛稱、車站…">
+  <div id="tabs"></div>
+  <div id="list"></div>
+</nav>
+
+<footer id="bar">
+  <div class="ctl">
+    <label class="mono dim">HAND-DRAWN WOBBLE</label>
+    <input id="wob" type="range" min="0" max="1.5" step="0.01" value="0.55">
+  </div>
+  <div class="ctl small">
+    <label class="mono dim">CARS <span id="carsV">3</span></label>
+    <input id="cars" type="range" min="2" max="8" step="1" value="3">
+  </div>
+  <div class="ctl">
+    <label class="mono dim">COLOUR</label>
+    <div id="swatches"></div>
+  </div>
+  <div class="ctl btns">
+    <button id="resetView" class="pill">重設視角</button>
+    <button id="sound" class="pill">音效 關</button>
+  </div>
+</footer>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
