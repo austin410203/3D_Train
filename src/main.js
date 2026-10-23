@@ -19,8 +19,10 @@ controls.enableDamping = true; controls.dampingFactor = 0.12;
 controls.maxPolarAngle = Math.PI * 0.47; controls.minZoom = 0.5; controls.maxZoom = 8;
 let viewHalfH = 20;
 
+// Phones (portrait or landscape): drawer overlays the scene and the info card starts collapsed.
+const compact = () => innerWidth < 720 || innerHeight < 500;
 // Width covered by the open drawer: the scene is centred in the remaining area.
-const drawerPx = () => (document.body.classList.contains('drawer') && innerWidth >= 720 ? 312 : 0);
+const drawerPx = () => (document.body.classList.contains('drawer') && !compact() ? 312 : 0);
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
@@ -333,12 +335,14 @@ $('#list').onclick = (e) => {
   const b = e.target.closest('.item'); if (!b) return;
   loadModel(MODEL_BY_ID[b.dataset.id], { keepCount: false });
   S.nShow = null;
-  if (innerWidth < 720) document.body.classList.remove('drawer');
+  if (compact()) document.body.classList.remove('drawer');
 };
 $('#search').oninput = (e) => { filter.q = e.target.value; buildList(); };
 $('#toggleList').onclick = () => { document.body.classList.toggle('drawer'); fitCamera(false); };
 $('#closeList').onclick = () => { document.body.classList.remove('drawer'); fitCamera(false); };
-if (innerWidth < 720) document.body.classList.remove('drawer');
+if (compact()) $('#card').classList.add('mini');
+else document.body.classList.add('drawer');
+$('#card').onclick = () => $('#card').classList.toggle('mini');
 $('#pause').onclick = () => { S.paused = !S.paused; $('#pause').textContent = S.paused ? '繼續' : '暫停'; };
 $('#cycle').onchange = (e) => { S.cycle = e.target.checked; };
 $('#prev').onclick = () => { const l = filteredModels(); const i = l.indexOf(S.model); loadModel(l[(i - 1 + l.length) % l.length] || MODELS[0], { keepCount: !!S.nShow }); };
